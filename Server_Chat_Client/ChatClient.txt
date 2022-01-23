@@ -1,0 +1,96 @@
+import java.io.BufferedReader;
+import java.net.Socket;
+import java.io.BufferedWriter;
+import java.io.*;
+import java.util.Scanner;
+import java.io.OutputStreamWriter;
+import java.io.InputStreamReader;
+import java.io.IOException;
+import javax.imageio.IIOException;
+
+//similar to client handler class but here we're going to
+//use threads to deal with blocking operations -- not implement runnable interface
+public class ChatClient {
+
+    private Socket socket;
+    private BufferedReader bufferedReader;
+    private BufferedWriter bufferedWriter;
+    private String username;
+
+    //main function
+    public static void main(String[] args) throws IOException {
+        Scanner scanner = new Scanner(System.in);
+        System.out.println("Enter Name for Group Chat!");
+        String username = scanner.nextLine();
+        Socket socket = new Socket( "localhost", 23657);
+        ChatClient client = new ChatClient(socket, username);
+        client.clientListenMsg();
+        client.clientSendMsg();
+    }
+
+    //below constructor is used to instantiate every property
+    public ChatClient(Socket socket, String username) {
+        try {
+            this.socket = socket;
+            this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.username = username;
+        } catch (IOException e) {
+            shutdownAll(socket, bufferedReader, bufferedWriter);
+        }
+    }
+
+    //used to send messages to the client handler
+    public void clientSendMsg() {
+        try {
+            bufferedWriter.write(username);
+            bufferedWriter.newLine();
+            bufferedWriter.flush();
+
+            Scanner scanner = new Scanner(System.in);
+            while (socket.isConnected()) {
+                String messageToSend = scanner.nextLine();
+                bufferedWriter.write( username + ":" + messageToSend);
+                bufferedWriter.newLine();
+                bufferedWriter.flush();
+            }
+        } catch (IOException e) {
+            shutdownAll(socket, bufferedReader, bufferedWriter);
+        }
+    }
+
+    //for messages that are being broadcasted
+    public void clientListenMsg() {
+        new Thread (new Runnable() {
+            @Override
+            public void run() {
+                String msgFromGroupChat;
+
+                while (socket.isConnected()) {
+                    try {
+                        msgFromGroupChat = bufferedReader.readLine();
+                        System.out.println(msgFromGroupChat);
+                    } catch (IOException e) {
+                        shutdownAll(socket, bufferedReader, bufferedWriter);
+                    }
+                }
+            }
+        }).start();
+    }
+
+    public void shutdownAll(Socket socket, BufferedReader bufferedReader, BufferedWriter bufferedWriter) {
+        try {
+            if (bufferedReader != null) {
+                bufferedReader.close();
+            }
+            if (bufferedWriter != null) {
+                bufferedWriter.close();
+            }
+            if (socket !=null) {
+                socket.close();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
